@@ -2,7 +2,6 @@ import os
 
 from flask import Flask, render_template, request, flash, redirect, session, g
 from flask_debugtoolbar import DebugToolbarExtension
-from sqlalchemy.exc import IntegrityError
 
 from forms import UserAddForm, LoginForm, MessageForm
 from models import db, connect_db, User, Message
@@ -77,7 +76,7 @@ def signup():
             )
             db.session.commit()
 
-        except IntegrityError:
+        except Error:
             flash("Username already taken", 'danger')
             return render_template('users/signup.html', form=form)
 
