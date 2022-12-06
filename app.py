@@ -3,8 +3,10 @@ import os
 from flask import Flask, render_template, request, flash, redirect, session, g
 from flask_debugtoolbar import DebugToolbarExtension
 
-from forms import UserAddForm, LoginForm, MessageForm
-from models import db, connect_db, User, Message
+from forms import UserAddForm, LoginForm, MessageForm, UserEditForm
+from models import db, connect_db, User, Message, Likes
+
+from seed import seeding
 
 CURR_USER_KEY = "curr_user"
 
@@ -13,7 +15,7 @@ app = Flask(__name__)
 # Get DB_URI from environ variable (useful for production/testing) or,
 # if not set there, use development local db.
 app.config['SQLALCHEMY_DATABASE_URI'] = (
-    os.environ.get('DATABASE_URL', 'postgresql:///warbler'))
+    os.environ.get('DATABASE_URL', 'postgresql://postgres:drowssap@localhost:5432/warbler'))
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ECHO'] = False
@@ -21,8 +23,7 @@ app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = True
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', "it's a secret")
 toolbar = DebugToolbarExtension(app)
 
-connect_db(app)
-
+connect_db(app)    
 
 ##############################################################################
 # User signup/login/logout
@@ -112,7 +113,10 @@ def login():
 def logout():
     """Handle logout of user."""
 
-    # IMPLEMENT THIS
+    do_logout()
+    flash("Logout successful.", 'success')
+    return redirect('/login')
+    
 
 
 ##############################################################################
@@ -211,6 +215,31 @@ def profile():
     """Update profile for current user."""
 
     # IMPLEMENT THIS
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+    
+    form = UserEditForm()
+
+    if form.validate_on_submit():
+        try:
+            if g.user == User.authenticate(form.username.data,form.password.data):
+                g.user.username = form.username.data #if form.username.data
+                g.user.email = form.email.data #if form.email.data
+                g.user.bio = form.bio.data #if form.bio.data
+                g.user.image_url = form.image_url.data #if form.image_url.data
+                g.user.header_image_url = form.header_image_url.data #if form.header_image_url.data
+            else:
+                raise Exception('Invalid username/password')
+            db.session.commit()
+        except Exception as e:
+            flash(e.message, 'danger')
+            return redirect('/')
+
+        return redirect(f"/users/{g.user.id}")
+
+    else:
+        return render_template('users/edit.html', form=form)
 
 
 @app.route('/users/delete', methods=["POST"])
@@ -277,6 +306,27 @@ def messages_destroy(message_id):
 
     return redirect(f"/users/{g.user.id}")
 
+##############################################################################
+# Likes routes:
+
+@app.route('/users/add_like/<int:message_id>', methods=["POST"])
+def toggle_like(message_id):
+    liked_message_ids = [m.id for m in g.user.likes]
+    if message_id in liked_message_ids:
+        like = Likes.query.filter_by(message_id=message_id,user_id=g.user.id).first()
+        db.session.delete(like)
+    else:
+        like = Likes(user_id=g.user.id, message_id=message_id)
+        db.session.add(like)
+    db.session.commit()
+
+    return redirect("/")
+
+@app.route('/users/<int:user_id>/likes', methods=["GET"])
+def show_likes(user_id):
+    user = User.query.get_or_404(user_id)
+    return render_template('/users/likes.html', user=user)
+
 
 ##############################################################################
 # Homepage and error pages
@@ -291,13 +341,17 @@ def homepage():
     """
 
     if g.user:
+        following_ids = [f.id for f in g.user.following]
+        following_ids.append(g.user.id)
         messages = (Message
                     .query
+                    .filter(Message.user_id.in_(following_ids))
                     .order_by(Message.timestamp.desc())
                     .limit(100)
                     .all())
 
-        return render_template('home.html', messages=messages)
+        liked_message_ids = [m.id for m in g.user.likes]
+        return render_template('home.html', messages=messages, likes=liked_message_ids) 
 
     else:
         return render_template('home-anon.html')
