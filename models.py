@@ -17,13 +17,13 @@ class Follows(db.Model):
     user_being_followed_id = db.Column(
         db.Integer,
         db.ForeignKey('users.id', ondelete="cascade"),
-        primary_key=True,
+        primary_key=True
     )
 
     user_following_id = db.Column(
         db.Integer,
         db.ForeignKey('users.id', ondelete="cascade"),
-        primary_key=True,
+        primary_key=True
     )
 
 
@@ -51,7 +51,7 @@ class Likes(db.Model):
 
 class User(db.Model):
     """User in the system."""
-
+ 
     __tablename__ = 'users'
 
     id = db.Column(
@@ -90,8 +90,8 @@ class User(db.Model):
     )
 
     password = db.Column(
-        db.Text,
-        nullable=False,
+        db.String(100),
+        nullable=False
     )
 
     messages = db.relationship('Message')
@@ -100,14 +100,16 @@ class User(db.Model):
         "User",
         secondary="follows",
         primaryjoin=(Follows.user_being_followed_id == id),
-        secondaryjoin=(Follows.user_following_id == id)
+        secondaryjoin=(Follows.user_following_id == id),
+        overlaps="following"
     )
 
     following = db.relationship(
         "User",
         secondary="follows",
         primaryjoin=(Follows.user_following_id == id),
-        secondaryjoin=(Follows.user_being_followed_id == id)
+        secondaryjoin=(Follows.user_being_followed_id == id),
+        overlaps="followers"
     )
 
     likes = db.relationship(
@@ -131,23 +133,26 @@ class User(db.Model):
         return len(found_user_list) == 1
 
     @classmethod
-    def signup(cls, username, email, password, image_url):
+    def signup(cls, username, email, password, image_url=None):
         """Sign up user.
 
         Hashes password and adds user to system.
         """
 
         hashed_pwd = bcrypt.generate_password_hash(password).decode('UTF-8')
-
         user = User(
-            username=username,
-            email=email,
-            password=hashed_pwd,
-            image_url=image_url,
-        )
-
-        db.session.add(user)
-        return user
+                username=username,
+                email=email,
+                password=hashed_pwd,
+                image_url=image_url,
+            )
+        try:
+            if username is None or email is None or password is None:
+                raise Exception('Invalid credentials')
+            db.session.add(user)
+            return user
+        except Exception as e:
+            return e
 
     @classmethod
     def authenticate(cls, username, password):
@@ -159,14 +164,15 @@ class User(db.Model):
 
         If can't find matching user (or if password is wrong), returns False.
         """
-
-        user = cls.query.filter_by(username=username).first()
-
+        try:
+            user = cls.query.filter_by(username=username).first()
+        except Exception as e:
+            return e
         if user:
             is_auth = bcrypt.check_password_hash(user.password, password)
+            # bcrypt.check_password_hash(pw_hash, password)
             if is_auth:
                 return user
-
         return False
 
 
@@ -197,7 +203,7 @@ class Message(db.Model):
         nullable=False,
     )
 
-    user = db.relationship('User')
+    user = db.relationship('User', overlaps="messages")
 
 
 def connect_db(app):
