@@ -100,13 +100,11 @@ def login():
     if form.validate_on_submit():
         user = User.authenticate(form.username.data, form.password.data)
         if type(user) is Exception:
-            flash("Invalid username", "danger")
+            flash("Invalid credentials.", "danger")
         elif user:
             do_login(user)
             flash(f"Hello, {user.username}!", "success")
             return redirect("/")
-
-        flash("Invalid credentials.", "danger")
 
     return render_template("users/login.html", form=form)
 
@@ -216,7 +214,6 @@ def stop_following(follow_id):
 def profile():
     """Update profile for current user."""
 
-    # IMPLEMENT THIS
     if not g.user:
         flash("Access unauthorized.", "danger")
         return redirect("/")
@@ -230,9 +227,7 @@ def profile():
                 g.user.email = form.email.data  # if form.email.data
                 g.user.bio = form.bio.data  # if form.bio.data
                 g.user.image_url = form.image_url.data  # if form.image_url.data
-                g.user.header_image_url = (
-                    form.header_image_url.data
-                )  # if form.header_image_url.data
+                g.user.header_image_url = form.header_image_url.data  # if form.header_image_url.data
             else:
                 raise Exception("Invalid username/password")
             db.session.commit()
@@ -275,7 +270,6 @@ def messages_add():
 
     if not g.user:
         flash("Access unauthorized.", "danger")
-        print('argh')
         return redirect("/")
 
     form = MessageForm()

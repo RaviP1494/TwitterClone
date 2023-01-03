@@ -49,58 +49,58 @@ class UserModelTestCase(TestCase):
                 username="testuser2",
                 password="HASHED_PASSWORD"
             )
-        with app.test_client() as client:
-            db.session.add(self.user1)
-            db.session.add(self.user2)
-            db.session.commit()
+        
+        db.session.add(self.user1)
+        db.session.add(self.user2)
+        db.session.commit()
 
     def tearDown(self):
-        with app.test_client() as client:
-            User.query.delete()
-            Message.query.delete()
-            Follows.query.delete()
-            db.session.commit()
+        
+        User.query.delete()
+        Message.query.delete()
+        Follows.query.delete()
+        db.session.commit()
         self.context.pop()
         
 
     def test_user_model(self):
         """Does basic model work?"""
-        with app.test_client() as client:
-            self.assertEqual(len(self.user1.messages), 0)
-            self.assertEqual(len(self.user1.followers), 0)
-            self.assertIn("<User #", str(self.user1))
+        
+        self.assertEqual(len(self.user1.messages), 0)
+        self.assertEqual(len(self.user1.followers), 0)
+        self.assertIn("<User #", str(self.user1))
 
     def test_user_follow(self):
         """"Testing following and follower functionality"""
-        with app.test_client() as client:
-            u1 = self.user1
-            u2 = self.user2
-            u1.following.append(u2)
+        
+        u1 = self.user1
+        u2 = self.user2
+        u1.following.append(u2)
             
-            self.assertTrue(u2.is_followed_by(u1))
-            self.assertTrue(u1.is_following(u2))
-            self.assertEqual(u2.followers[0].id, u1.id)
+        self.assertTrue(u2.is_followed_by(u1))
+        self.assertTrue(u1.is_following(u2))
+        self.assertEqual(u2.followers[0].id, u1.id)
 
-            self.assertFalse(u1.is_followed_by(u2))
-            self.assertFalse(u2.is_following(u1))
+        self.assertFalse(u1.is_followed_by(u2))
+        self.assertFalse(u2.is_following(u1))
 
     def test_user_create(self):
         """Testing creation of users"""
-        with app.test_client() as client:
-            u = User.signup(username = 'signup_test',email = 'signup@test.com', password = 'password', image_url='k')
-            db.session.commit()
-            self.assertEqual(u, User.query.get(u.id))
-            user = User.signup(None,email = 'asdc@test.com', password = 'password', image_url='k')
-            self.assertIs(type(user),Exception)
+        
+        u = User.signup(username = 'signup_test',email = 'signup@test.com', password = 'password', image_url='k')
+        db.session.commit()
+        self.assertEqual(u, User.query.get(u.id))
+        user = User.signup(None,email = 'asdc@test.com', password = 'password', image_url='k')
+        self.assertIs(type(user),Exception)
 
     def test_user_authenticate(self):
         """Testing user authentication"""
-        with app.test_client() as client:
-            user = User.signup(username = 'authuser', email = 'signup@test.com', password = 'password')
-            db.session.commit()
-            validUser = User.authenticate(user.username, 'password')
-            invalidName = User.authenticate("doesnotexist", 'password')
-            invalidPassword = User.authenticate(user.username, "isnotcorrect")
-            self.assertEqual(user.username,validUser.username)
-            self.assertFalse(invalidName)
-            self.assertFalse(invalidPassword)
+        
+        user = User.signup(username = 'authuser', email = 'signup@test.com', password = 'password')
+        db.session.commit()
+        validUser = User.authenticate(user.username, 'password')
+        invalidName = User.authenticate("doesnotexist", 'password')
+        invalidPassword = User.authenticate(user.username, "isnotcorrect")
+        self.assertEqual(user.username,validUser.username)
+        self.assertFalse(invalidName)
+        self.assertFalse(invalidPassword)

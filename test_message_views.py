@@ -42,27 +42,21 @@ class MessageViewTestCase(TestCase):
 
     def setUp(self):
         """Create test client, add sample data."""
-        self.app = app
-        self.client = app.test_client()
         self.context = app.app_context()
         self.context.push()
-
+        self.client = app.test_client()
         db.drop_all()
         db.create_all()
 
-
-        # with self.app.app_context():
-        with self.app.test_client():
-            User.query.delete()
-            Message.query.delete()
-            self.client = app.test_client()
-            self.testuser = User.signup(username="testuser",
-                                        email="test@test.com",
-                                        password="testuser",
-                                        image_url=None)
-            self.testuser_id = 9999
-            self.testuser.id = self.testuser_id
-            db.session.commit()
+        User.query.delete()
+        Message.query.delete()
+        self.testuser = User.signup(username="testuser",
+                                    email="test@test.com",
+                                    password="testuser",
+                                    image_url=None)
+        self.testuser_id = 9999
+        self.testuser.id = self.testuser_id
+        db.session.commit()
 
     def tearDown(self):
         self.context.pop()
@@ -73,6 +67,10 @@ class MessageViewTestCase(TestCase):
         # Since we need to change the session to mimic logging in,
         # we need to use the changing-session trick:
         with self.client as c:
+            unauthorized_response = c.post("messages/new", data={"text": "ouch"})
+            self.assertEqual(unauthorized_response.status_code, 302)
+            self.assertIn(b'<a href="/"',unauthorized_response.data)
+
             with c.session_transaction() as sess:
                 sess[CURR_USER_KEY] = self.testuser.id
 
@@ -80,10 +78,36 @@ class MessageViewTestCase(TestCase):
             # the rest of ours test
             
             resp = c.post("/messages/new", data={"text": "Hello"})
-            print(resp.text)
-
-            # Make sure it redirects
+        
             self.assertEqual(resp.status_code, 302)
 
             msg = Message.query.one()
             self.assertEqual(msg.text, "Hello")
+
+    def test_show_message(self):
+        with self.client as c:
+
+            msg = Message(text = "boop", user_id = self.testuser.id)
+            db.session.add(msg)
+            db.session.commit()
+            show_msg_resp = c.get(f"messages/{msg.id}")
+            self.assertIn(b'boop',show_msg_resp.data)
+            self.assertEqual(show_msg_resp.status_code, 200)
+
+    def test_destroy_message(self):
+        with self.client as c:
+            
+            msg = Message(text = "boop", user_id = self.testuser.id)
+            db.session.add(msg)
+            db.session.commit()
+
+            unauthorized_response = c.post(f"/messages/{msg.id}/delete")
+            self.assertEqual(unauthorized_response.status_code, 302)
+            self.assertIn(b'<a href="/"',unauthorized_response.data)
+
+            with c.session_transaction() as sess:
+                sess[CURR_USER_KEY] = self.testuser.id
+
+            authorized_response = c.post(f"/messages/{msg.id}/delete")
+            self.assertEqual(len(self.testuser.messages), 0)
+            self.assertEqual(authorized_response.status_code, 302)

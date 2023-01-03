@@ -23,9 +23,8 @@ class MessageModelTestCase(TestCase):
         Follows.query.delete()
         self.user_pw = 'password'
         self.user = User.signup(username='tester', email='tester@test.com', password=self.user_pw)
-        with app.test_client() as client:
-            db.session.add(self.user)
-            db.session.commit()
+        db.session.add(self.user)
+        db.session.commit()
 
     def tearDown(self):
         """Remove app context"""
@@ -33,8 +32,11 @@ class MessageModelTestCase(TestCase):
 
     def test_message_model(self):
         message = Message(text='hello there', user_id = self.user.id)
-        with app.test_client() as client:
-            db.session.add(message)
-            db.session.commit()
+        db.session.add(message)
+        db.session.commit()
         self.assertEqual(len(self.user.messages),1)
-        
+        self.assertEqual(self.user.messages[0].text, 'hello there')
+
+        db.session.delete(message)
+        db.session.commit()
+        self.assertEqual(len(self.user.messages), 0)
